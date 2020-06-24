@@ -17,9 +17,13 @@ public class CustomRecursiveTask extends RecursiveAction {
     
     private String url;
     private static ConcurrentHashMap<String, List<String>> allLinks = new ConcurrentHashMap<>();
+    private static String initialUrl = "";
 
     public CustomRecursiveTask(String url) {
         this.url = url;
+
+        if (initialUrl.equals(""))
+            initialUrl = url;
     }
 
     @Override
@@ -42,11 +46,12 @@ public class CustomRecursiveTask extends RecursiveAction {
                 if (currentLink== null || currentLink.equals("") || currentLink.equals("/"))
                     continue;
 
-                    //если находим очерние ссылки создаем подзадачу
+                    //если находим дочерние ссылки создаем подзадачу
                     if (currentLink.charAt(0) == '/'
-                            && !allLinks.containsKey("https://lenta.ru" + currentLink)
-                            && ("https://lenta.ru" + currentLink).contains(url)
-                            && !("https://lenta.ru" + currentLink).equals(url)) {
+                            && !allLinks.containsKey(initialUrl + currentLink)
+                            && (initialUrl + currentLink).contains(url)
+                            && !(initialUrl + currentLink).equals(url)
+                            && currentLink.charAt(currentLink.length() - 1) == '/') {
 
                         sublinks.add(currentLink);
                         count++;
@@ -60,7 +65,7 @@ public class CustomRecursiveTask extends RecursiveAction {
             else{
                 printMap(allLinks);
             }
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             e.getMessage();
         }
     }
@@ -68,8 +73,8 @@ public class CustomRecursiveTask extends RecursiveAction {
     private void printMap(Map<String, List<String>> allLinks) {
         try(FileWriter writer = new FileWriter("./result.txt", false)) {
 
-            writer.write("https://lenta.ru" + '\n');
-            for (String iterator : allLinks.get("https://lenta.ru")) {
+            writer.write(initialUrl + '\n');
+            for (String iterator : allLinks.get(initialUrl)) {
                 printLinks(iterator, 0, writer);
             }
             writer.flush();
@@ -81,15 +86,16 @@ public class CustomRecursiveTask extends RecursiveAction {
 
 
 
-    public List<CustomRecursiveTask> createSubtasks(ArrayList<String> links) {
+    public List<CustomRecursiveTask> createSubtasks(ArrayList<String> links) throws InterruptedException {
 
         List<CustomRecursiveTask> taskList = new ArrayList<>();
         List<String> subLinks = new ArrayList<>();
 
         for (String currentLink : links) {
 
-            subLinks.add("https://lenta.ru" + currentLink);
-            taskList.add(new CustomRecursiveTask("https://lenta.ru" + currentLink));
+            subLinks.add(initialUrl + currentLink);
+            Thread.sleep(150);
+            taskList.add(new CustomRecursiveTask(initialUrl + currentLink));
 
         }
         allLinks.replace(url, subLinks);
