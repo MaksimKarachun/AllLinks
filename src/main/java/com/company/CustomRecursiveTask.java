@@ -16,11 +16,15 @@ import java.util.concurrent.RecursiveAction;
 public class CustomRecursiveTask extends RecursiveAction {
     
     private String url;
+    private int lvl;
     private static ConcurrentHashMap<String, List<String>> allLinks = new ConcurrentHashMap<>();
     private static String initialUrl = "";
+    private static String outPutFilePath;
+    public static int nestingLvl;
 
-    public CustomRecursiveTask(String url) {
+    public CustomRecursiveTask(String url, int lvl) {
         this.url = url;
+        this.lvl = lvl;
 
         if (initialUrl.equals(""))
             initialUrl = url;
@@ -41,37 +45,33 @@ public class CustomRecursiveTask extends RecursiveAction {
             //проходим по всем ссылкам
             for (Element link : links) {
 
-                String currentLink = link.attr("href");
-
-                if (currentLink== null || currentLink.equals("") || currentLink.equals("/"))
-                    continue;
+                String currentLink = link.absUrl("href");
 
                     //если находим дочерние ссылки создаем подзадачу
-                    if (currentLink.charAt(0) == '/'
-                            && !allLinks.containsKey(initialUrl + currentLink)
-                            && (initialUrl + currentLink).contains(url)
-                            && !(initialUrl + currentLink).equals(url)
-                            && currentLink.charAt(currentLink.length() - 1) == '/') {
+                    if (currentLink.startsWith(url)
+                            && currentLink.endsWith("/")
+                            && !allLinks.containsKey(currentLink)) {
 
                         sublinks.add(currentLink);
                         count++;
                     }
-
             }
 
             //условие возврата
-            if (count != 0)
+            if (lvl <= nestingLvl && count != 0)
                 ForkJoinTask.invokeAll(createSubtasks(sublinks));
             else{
                 printMap(allLinks);
             }
+
         } catch (IOException | InterruptedException e) {
             e.getMessage();
         }
     }
 
+
     private void printMap(Map<String, List<String>> allLinks) {
-        try(FileWriter writer = new FileWriter("./result.txt", false)) {
+        try(FileWriter writer = new FileWriter(outPutFilePath, false)) {
 
             writer.write(initialUrl + '\n');
             for (String iterator : allLinks.get(initialUrl)) {
@@ -85,24 +85,18 @@ public class CustomRecursiveTask extends RecursiveAction {
     }
 
 
-
     public List<CustomRecursiveTask> createSubtasks(ArrayList<String> links) throws InterruptedException {
 
         List<CustomRecursiveTask> taskList = new ArrayList<>();
-        List<String> subLinks = new ArrayList<>();
-
+        int currentLvl = lvl + 1;
         for (String currentLink : links) {
-
-            subLinks.add(initialUrl + currentLink);
             Thread.sleep(150);
-            taskList.add(new CustomRecursiveTask(initialUrl + currentLink));
-
+            taskList.add(new CustomRecursiveTask(currentLink, currentLvl));
         }
-        allLinks.replace(url, subLinks);
+        allLinks.replace(url, links);
 
         return taskList;
     }
-
 
     public void printLinks(String link, int lvl, FileWriter writer) throws IOException {
         lvl++;
@@ -119,4 +113,11 @@ public class CustomRecursiveTask extends RecursiveAction {
         }
     }
 
+    public static void setResultPath(String path){
+        outPutFilePath = path;
+    }
+
+    public static void setNestingLvl(int nestingLvl) {
+        CustomRecursiveTask.nestingLvl = nestingLvl;
+    }
 }
